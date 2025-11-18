@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Appointments</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="container">
+  <h1>Appointment Booking</h1>
+
+  <div class="card">
+    <h3>New Appointment</h3>
+
+    <form id="form">
+      <input id="patientId" type="number" placeholder="Patient ID" required><br>
+
+      <select id="deptSelect" required></select><br>
+
+      <input id="date" type="date" required><br>
+
+      <input id="time" type="time"><br>
+
+      <select id="type">
+        <option value="NEW">NEW</option>
+        <option value="FOLLOWUP">FOLLOWUP</option>
+        <option value="EMERGENCY">EMERGENCY</option>
+      </select><br>
+
+      <button type="submit">Book Appointment</button>
+    </form>
+
+    <p id="msg" style="color:red"></p>
+  </div>
+
+  <div class="card">
+    <h3>All Appointments</h3>
+    <table id="table" border="1" class="table">
+      <thead>
+        <tr>
+          <th>ID</th><th>Patient</th><th>Dept</th><th>Date</th><th>Type</th><th>Room</th><th>Delete</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script type="module" src="../dist/appointments.js"></script>
+</body>
+</html>
