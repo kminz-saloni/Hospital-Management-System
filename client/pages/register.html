@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patient Registration - HealthCare+</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    .auth-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 2rem 0;
+    }
+
+    .auth-card {
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-xl);
+      padding: 3rem;
+      max-width: 500px;
+      width: 100%;
+      margin: 0 1rem;
+    }
+
+    .auth-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .auth-header h1 {
+      color: var(--primary-color);
+      margin-bottom: 0.5rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 768px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>🏥 Create Account</h1>
+        <p>Join HealthCare+ to book appointments</p>
+      </div>
+
+      <div id="alertContainer"></div>
+
+      <form id="registerForm">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" class="form-control" id="name" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email Address *</label>
+          <input type="email" class="form-control" id="email" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Password *</label>
+          <input type="password" class="form-control" id="password" required minlength="6">
+          <small class="text-muted">Minimum 6 characters</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Age</label>
+            <input type="number" class="form-control" id="age" min="1" max="120">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Gender</label>
+            <select class="form-select" id="gender">
+              <option value="">Select...</option>
+              <option value="M">Male</option>
+              <option value="F">Female</option>
+              <option value="O">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <input type="tel" class="form-control" id="phone">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Address</label>
+          <textarea class="form-control" id="address" rows="3"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;" id="submitBtn">
+          Register
+        </button>
+
+        <p class="text-center mt-3">
+          Already have an account? <a href="login.html" style="color: var(--primary-color); font-weight: 600;">Login here</a>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    const registerForm = document.getElementById('registerForm');
+    const alertContainer = document.getElementById('alertContainer');
+    const submitBtn = document.getElementById('submitBtn');
+
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = {
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+        age: document.getElementById('age').value || null,
+        gender: document.getElementById('gender').value || null,
+        phone: document.getElementById('phone').value.trim() || null,
+        address: document.getElementById('address').value.trim() || null
+      };
+
+      // Validate required fields
+      if (!formData.name || !formData.email || !formData.password) {
+        showAlert('Please fill in all required fields', 'error');
+        return;
+      }
+
+      // Disable submit button
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Registering...';
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          // Save patient info to localStorage
+          localStorage.setItem('patient', JSON.stringify(data.patient));
+          localStorage.setItem('userType', 'patient');
+          
+          showAlert('Registration successful! Redirecting...', 'success');
+          
+          setTimeout(() => {
+            window.location.href = 'patient_dashboard.html';
+          }, 1500);
+        } else {
+          showAlert(data.error || 'Registration failed', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Register';
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        showAlert('Network error. Please check if the server is running.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Register';
+      }
+    });
+
+    function showAlert(message, type) {
+      const alertClass = type === 'error' ? 'alert-error' : 'alert-success';
+      alertContainer.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+      setTimeout(() => {
+        alertContainer.innerHTML = '';
+      }, 5000);
+    }
+  </script>
+</body>
+</html>

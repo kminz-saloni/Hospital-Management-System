@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patient Dashboard - HealthCare+</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="../index.html" class="navbar-brand">🏥 HealthCare+</a>
+      <ul class="navbar-menu">
+        <li><a href="patient_dashboard.html">Dashboard</a></li>
+        <li><span id="patientName" style="color: var(--gray-800); font-weight: 600;"></span></li>
+        <li><button onclick="logout()" class="btn btn-sm btn-danger">Logout</button></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="dashboard-container">
+    <div class="dashboard-header">
+      <div class="container">
+        <h1 class="dashboard-title">Welcome, <span id="welcomeName"></span>! 👋</h1>
+        <p class="dashboard-subtitle">Manage your appointments and book new consultations</p>
+      </div>
+    </div>
+
+    <div class="dashboard-content">
+      <div class="container">
+        <div id="alertContainer"></div>
+
+        <!-- Book New Appointment Card -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h2 class="card-title">📅 Book New Appointment</h2>
+          </div>
+          <div class="card-body">
+            <form id="appointmentForm">
+              <div class="row">
+                <div class="col-6">
+                  <div class="form-group">
+                    <label class="form-label">Select Department *</label>
+                    <select class="form-select" id="department" required>
+                      <option value="">Choose a department...</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="form-group">
+                    <label class="form-label">Appointment Type *</label>
+                    <select class="form-select" id="appointmentType" required>
+                      <option value="NEW">New Consultation</option>
+                      <option value="FOLLOWUP">Follow-up</option>
+                      <option value="EMERGENCY">Emergency</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-6">
+                  <div class="form-group">
+                    <label class="form-label">Select Date *</label>
+                    <select class="form-select" id="appointmentDate" required disabled>
+                      <option value="">Select department first...</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="form-group">
+                    <label class="form-label">Preferred Time (Optional)</label>
+                    <input type="time" class="form-control" id="appointmentTime">
+                  </div>
+                </div>
+              </div>
+
+              <div id="slotsInfo" class="alert alert-info hidden mb-3">
+                <strong>Available Slots:</strong> <span id="remainingSlots">-</span> remaining
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-lg" id="bookBtn" disabled>
+                Book Appointment
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Your Appointments Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">📋 Your Upcoming Appointments</h2>
+          </div>
+          <div class="card-body">
+            <div id="appointmentsList">
+              <div style="text-align: center; padding: 2rem;">
+                <div class="spinner"></div>
+                <p class="mt-2">Loading appointments...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    // Protect page - patient only
+    protectPage('patient');
+
+    // Get patient info
+    const patient = getPatientInfo();
+    if (!patient) {
+      window.location.href = 'login.html';
+    }
+
+    document.getElementById('patientName').textContent = patient.Name;
+    document.getElementById('welcomeName').textContent = patient.Name;
+
+    let selectedDeptId = null;
+    let selectedDate = null;
+    let refreshInterval = null;
+
+    // Load departments on page load
+    loadDepartments();
+    loadAppointments();
+
+    async function loadDepartments() {
+      try {
+        const departments = await api.getDepartments();
+        const deptSelect = document.getElementById('department');
+        
+        departments.forEach(dept => {
+          const option = document.createElement('option');
+          option.value = dept.DeptID;
+          option.textContent = dept.Name;
+          deptSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading departments:', error);
+        utils.showAlert('alertContainer', 'Failed to load departments', 'error');
+      }
+    }
+
+    // Department selection handler
+    document.getElementById('department').addEventListener('change', async function() {
+      selectedDeptId = this.value;
+      const dateSelect = document.getElementById('appointmentDate');
+      const bookBtn = document.getElementById('bookBtn');
+      const slotsInfo = document.getElementById('slotsInfo');
+
+      if (!selectedDeptId) {
+        dateSelect.disabled = true;
+        dateSelect.innerHTML = '<option value="">Select department first...</option>';
+        bookBtn.disabled = true;
+        slotsInfo.classList.add('hidden');
+        return;
+      }
+
+      // Load available dates
+      try {
+        dateSelect.disabled = true;
+        dateSelect.innerHTML = '<option value="">Loading dates...</option>';
+
+        const today = utils.getTodayDate();
+        const endDate = utils.getDateAfterDays(30);
+        
+        const availableDates = await api.getAvailableDates(selectedDeptId, today, endDate);
+
+        dateSelect.innerHTML = '<option value="">Choose a date...</option>';
+        
+        if (availableDates.length === 0) {
+          dateSelect.innerHTML = '<option value="">No available dates</option>';
+          utils.showAlert('alertContainer', 'No available slots for this department in the next 30 days', 'warning');
+          return;
+        }
+
+        availableDates.forEach(dateInfo => {
+          const option = document.createElement('option');
+          option.value = dateInfo.date;
+          option.textContent = `${utils.formatDate(dateInfo.date)} (${dateInfo.remaining} slots available)`;
+          dateSelect.appendChild(option);
+        });
+
+        dateSelect.disabled = false;
+      } catch (error) {
+        console.error('Error loading dates:', error);
+        utils.showAlert('alertContainer', 'Failed to load available dates', 'error');
+      }
+    });
+
+    // Date selection handler
+    document.getElementById('appointmentDate').addEventListener('change', function() {
+      selectedDate = this.value;
+      const bookBtn = document.getElementById('bookBtn');
+      
+      if (selectedDate) {
+        bookBtn.disabled = false;
+        loadRemainingSlots();
+        
+        // Clear any existing interval
+        if (refreshInterval) clearInterval(refreshInterval);
+        
+        // Refresh slots every 6 seconds
+        refreshInterval = setInterval(loadRemainingSlots, 6000);
+      } else {
+        bookBtn.disabled = true;
+        document.getElementById('slotsInfo').classList.add('hidden');
+      }
+    });
+
+    async function loadRemainingSlots() {
+      if (!selectedDeptId || !selectedDate) return;
+
+      try {
+        const slotsData = await api.getRemainingSlots(selectedDeptId, selectedDate);
+        document.getElementById('remainingSlots').textContent = slotsData.remaining;
+        document.getElementById('slotsInfo').classList.remove('hidden');
+
+        if (slotsData.remaining === 0) {
+          document.getElementById('bookBtn').disabled = true;
+          utils.showAlert('alertContainer', 'No more slots available for this date', 'warning');
+        }
+      } catch (error) {
+        console.error('Error loading slots:', error);
+      }
+    }
+
+    // Book appointment form submission
+    document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const deptId = document.getElementById('department').value;
+      const date = document.getElementById('appointmentDate').value;
+      const time = document.getElementById('appointmentTime').value || null;
+      const type = document.getElementById('appointmentType').value;
+
+      const bookBtn = document.getElementById('bookBtn');
+      bookBtn.disabled = true;
+      bookBtn.textContent = 'Booking...';
+
+      try {
+        const appointmentData = {
+          PatientID: patient.PatientID,
+          DeptID: parseInt(deptId),
+          AppDate: date,
+          AppTime: time,
+          AppointmentType: type
+        };
+
+        const result = await api.createAppointment(appointmentData);
+
+        utils.showAlert('alertContainer', 
+          `Appointment booked successfully! Room: ${result.RoomNo || 'TBA'}, Appointment ID: ${result.AppointmentID}`, 
+          'success'
+        );
+
+        // Reset form
+        document.getElementById('appointmentForm').reset();
+        document.getElementById('appointmentDate').disabled = true;
+        document.getElementById('slotsInfo').classList.add('hidden');
+        
+        // Clear refresh interval
+        if (refreshInterval) {
+          clearInterval(refreshInterval);
+          refreshInterval = null;
+        }
+
+        // Reload appointments
+        loadAppointments();
+
+        bookBtn.textContent = 'Book Appointment';
+      } catch (error) {
+        console.error('Error booking appointment:', error);
+        utils.showAlert('alertContainer', error.message || 'Failed to book appointment', 'error');
+        bookBtn.disabled = false;
+        bookBtn.textContent = 'Book Appointment';
+      }
+    });
+
+    async function loadAppointments() {
+      const appointmentsList = document.getElementById('appointmentsList');
+      
+      try {
+        const appointments = await api.getPatientAppointments(patient.PatientID, true);
+
+        if (appointments.length === 0) {
+          appointmentsList.innerHTML = `
+            <div style="text-align: center; padding: 2rem; color: var(--gray-600);">
+              <p>No upcoming appointments</p>
+              <p class="text-muted">Book your first appointment above</p>
+            </div>
+          `;
+          return;
+        }
+
+        let html = '<div class="table-container"><table><thead><tr>';
+        html += '<th>Appointment ID</th><th>Department</th><th>Date</th><th>Time</th>';
+        html += '<th>Type</th><th>Room</th><th>Doctor</th><th>Action</th>';
+        html += '</tr></thead><tbody>';
+
+        appointments.forEach(apt => {
+          html += `<tr>
+            <td><strong>#${apt.AppointmentID}</strong></td>
+            <td>${apt.DeptName}</td>
+            <td>${utils.formatDate(apt.AppDate)}</td>
+            <td>${utils.formatTime(apt.AppTime)}</td>
+            <td><span class="badge badge-${apt.AppointmentType === 'NEW' ? 'primary' : apt.AppointmentType === 'EMERGENCY' ? 'danger' : 'success'}">${apt.AppointmentType}</span></td>
+            <td>${apt.RoomNo || 'TBA'}</td>
+            <td>${apt.DoctorName || 'TBA'}</td>
+            <td><button onclick="cancelAppointment(${apt.AppointmentID})" class="btn btn-sm btn-danger">Cancel</button></td>
+          </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        appointmentsList.innerHTML = html;
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        appointmentsList.innerHTML = '<p class="text-danger">Failed to load appointments</p>';
+      }
+    }
+
+    async function cancelAppointment(appointmentId) {
+      if (!confirm('Are you sure you want to cancel this appointment?')) return;
+
+      try {
+        await api.deleteAppointment(appointmentId);
+        utils.showAlert('alertContainer', 'Appointment cancelled successfully', 'success');
+        loadAppointments();
+      } catch (error) {
+        console.error('Error cancelling appointment:', error);
+        utils.showAlert('alertContainer', 'Failed to cancel appointment', 'error');
+      }
+    }
+
+    // Clean up interval on page unload
+    window.addEventListener('beforeunload', () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+    });
+  </script>
+</body>
+</html>

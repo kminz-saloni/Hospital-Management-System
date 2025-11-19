@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doctor Dashboard - HealthCare+</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="../index.html" class="navbar-brand">🏥 HealthCare+</a>
+      <ul class="navbar-menu">
+        <li><a href="doctor_dashboard.html">Dashboard</a></li>
+        <li><span id="doctorName" style="color: var(--gray-800); font-weight: 600;"></span></li>
+        <li><button onclick="logout()" class="btn btn-sm btn-danger">Logout</button></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="dashboard-container">
+    <div class="dashboard-header">
+      <div class="container">
+        <h1 class="dashboard-title">Dr. <span id="welcomeName"></span> 👨‍⚕️</h1>
+        <p class="dashboard-subtitle" id="specialization"></p>
+      </div>
+    </div>
+
+    <div class="dashboard-content">
+      <div class="container">
+        <div id="alertContainer"></div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon blue">📅</div>
+            <div class="stat-details">
+              <h3 id="todayCount">0</h3>
+              <p>Today's Appointments</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green">✅</div>
+            <div class="stat-details">
+              <h3 id="completedCount">0</h3>
+              <p>Completed Today</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon yellow">⏰</div>
+            <div class="stat-details">
+              <h3 id="upcomingCount">0</h3>
+              <p>Total Upcoming</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Appointment Tabs -->
+        <div class="card">
+          <div class="card-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h2 class="card-title">📋 Appointments</h2>
+              <div>
+                <button class="btn btn-primary btn-sm" onclick="switchView('today')" id="todayBtn">Today's Appointments</button>
+                <button class="btn btn-outline btn-sm" onclick="switchView('upcoming')" id="upcomingBtn">Upcoming</button>
+                <button class="btn btn-secondary btn-sm" onclick="refreshAppointments()">🔄 Refresh</button>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="appointmentsList">
+              <div style="text-align: center; padding: 2rem;">
+                <div class="spinner"></div>
+                <p class="mt-2">Loading appointments...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    // Protect page - doctor only
+    protectPage('doctor');
+
+    // Get doctor info
+    const doctor = getDoctorInfo();
+    if (!doctor) {
+      window.location.href = 'login.html';
+    }
+
+    document.getElementById('doctorName').textContent = 'Dr. ' + doctor.Name;
+    document.getElementById('welcomeName').textContent = doctor.Name;
+    document.getElementById('specialization').textContent = doctor.Specialization || 'Medical Professional';
+
+    let currentView = 'today';
+    let allAppointments = [];
+
+    // Load appointments on page load
+    loadAppointments();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(loadAppointments, 30000);
+
+    async function loadAppointments() {
+      try {
+        // Load all appointments
+        allAppointments = await api.getDoctorAppointments(doctor.DoctorID, false);
+        
+        // Filter today's appointments
+        const today = new Date().toISOString().split('T')[0];
+        const todayAppointments = allAppointments.filter(apt => apt.AppDate.startsWith(today));
+        
+        // Filter future appointments
+        const futureAppointments = allAppointments.filter(apt => new Date(apt.AppDate) >= new Date(today));
+
+        // Update stats
+        document.getElementById('todayCount').textContent = todayAppointments.length;
+        document.getElementById('upcomingCount').textContent = futureAppointments.length;
+        
+        // Calculate completed (you can add a status field in the database)
+        document.getElementById('completedCount').textContent = '0';
+
+        // Display appointments based on current view
+        displayAppointments(currentView === 'today' ? todayAppointments : futureAppointments);
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        utils.showAlert('alertContainer', 'Failed to load appointments', 'error');
+      }
+    }
+
+    function switchView(view) {
+      currentView = view;
+      
+      // Update button styles
+      const todayBtn = document.getElementById('todayBtn');
+      const upcomingBtn = document.getElementById('upcomingBtn');
+      
+      if (view === 'today') {
+        todayBtn.className = 'btn btn-primary btn-sm';
+        upcomingBtn.className = 'btn btn-outline btn-sm';
+      } else {
+        todayBtn.className = 'btn btn-outline btn-sm';
+        upcomingBtn.className = 'btn btn-primary btn-sm';
+      }
+
+      // Filter and display appointments
+      const today = new Date().toISOString().split('T')[0];
+      const filtered = view === 'today' 
+        ? allAppointments.filter(apt => apt.AppDate.startsWith(today))
+        : allAppointments.filter(apt => new Date(apt.AppDate) >= new Date(today));
+
+      displayAppointments(filtered);
+    }
+
+    function displayAppointments(appointments) {
+      const appointmentsList = document.getElementById('appointmentsList');
+
+      if (appointments.length === 0) {
+        appointmentsList.innerHTML = `
+          <div style="text-align: center; padding: 2rem; color: var(--gray-600);">
+            <p>No appointments found</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '<div class="table-container"><table><thead><tr>';
+      html += '<th>ID</th><th>Time</th><th>Patient</th><th>Age</th><th>Gender</th>';
+      html += '<th>Phone</th><th>Department</th><th>Type</th><th>Room</th><th>Details</th>';
+      html += '</tr></thead><tbody>';
+
+      appointments.forEach(apt => {
+        const typeColor = apt.AppointmentType === 'NEW' ? 'primary' : 
+                         apt.AppointmentType === 'EMERGENCY' ? 'danger' : 'success';
+        
+        html += `<tr>
+          <td><strong>#${apt.AppointmentID}</strong></td>
+          <td>${utils.formatTime(apt.AppTime)}</td>
+          <td><strong>${apt.PatientName}</strong></td>
+          <td>${apt.Age || 'N/A'}</td>
+          <td>${apt.Gender || 'N/A'}</td>
+          <td>${apt.PatientPhone || 'N/A'}</td>
+          <td>${apt.DeptName}</td>
+          <td><span class="badge badge-${typeColor}">${apt.AppointmentType}</span></td>
+          <td><strong>${apt.RoomNo || 'TBA'}</strong></td>
+          <td><button onclick="showPatientDetails(${apt.AppointmentID})" class="btn btn-sm btn-primary">View</button></td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      appointmentsList.innerHTML = html;
+    }
+
+    function showPatientDetails(appointmentId) {
+      const appointment = allAppointments.find(apt => apt.AppointmentID === appointmentId);
+      if (!appointment) return;
+
+      const details = `
+        <strong>Patient Information</strong><br>
+        Name: ${appointment.PatientName}<br>
+        Age: ${appointment.Age || 'N/A'}<br>
+        Gender: ${appointment.Gender || 'N/A'}<br>
+        Phone: ${appointment.PatientPhone || 'N/A'}<br><br>
+        <strong>Appointment Details</strong><br>
+        Date: ${utils.formatDate(appointment.AppDate)}<br>
+        Time: ${utils.formatTime(appointment.AppTime)}<br>
+        Type: ${appointment.AppointmentType}<br>
+        Department: ${appointment.DeptName}<br>
+        Room: ${appointment.RoomNo || 'TBA'}
+      `;
+
+      alert(details); // In a real app, use a modal
+    }
+
+    function refreshAppointments() {
+      utils.showAlert('alertContainer', 'Refreshing appointments...', 'info');
+      loadAppointments();
+    }
+  </script>
+</body>
+</html>

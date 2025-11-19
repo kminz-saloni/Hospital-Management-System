@@ -8,6 +8,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // ROUTES
+const authRouter = require("./routes/auth");
 const appointmentsRouter = require("./routes/appointments");
 const departmentsRouter = require("./routes/departments");
 const patientsRouter = require("./routes/patients");
@@ -16,6 +17,7 @@ const roomsRouter = require("./routes/rooms");
 const admissionsRouter = require("./routes/admissions");
 const billingRouter = require("./routes/billing");
 
+app.use("/api/auth", authRouter);
 app.use("/api/appointments", appointmentsRouter);
 app.use("/api/departments", departmentsRouter);
 app.use("/api/patients", patientsRouter);

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - HealthCare+</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    .auth-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 2rem 0;
+    }
+
+    .auth-card {
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-xl);
+      padding: 3rem;
+      max-width: 450px;
+      width: 100%;
+      margin: 0 1rem;
+    }
+
+    .auth-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .auth-header h1 {
+      color: var(--primary-color);
+      margin-bottom: 0.5rem;
+    }
+
+    .login-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+      border-bottom: 2px solid var(--gray-200);
+    }
+
+    .login-tab {
+      flex: 1;
+      padding: 1rem;
+      text-align: center;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--gray-600);
+      transition: var(--transition);
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+    }
+
+    .login-tab.active {
+      color: var(--primary-color);
+      border-bottom-color: var(--primary-color);
+    }
+
+    .login-tab:hover {
+      color: var(--primary-color);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>🏥 Welcome Back</h1>
+        <p>Login to your account</p>
+      </div>
+
+      <div class="login-tabs">
+        <button class="login-tab active" onclick="switchTab('patient')">Patient</button>
+        <button class="login-tab" onclick="switchTab('doctor')">Doctor</button>
+        <button class="login-tab" onclick="switchTab('admin')">Admin</button>
+      </div>
+
+      <div id="alertContainer"></div>
+
+      <!-- Patient Login -->
+      <div id="patientTab" class="tab-content active">
+        <form id="patientLoginForm">
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" class="form-control" id="patientEmail" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" id="patientPassword" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;" id="patientSubmitBtn">
+            Login
+          </button>
+
+          <p class="text-center mt-3">
+            Don't have an account? <a href="register.html" style="color: var(--primary-color); font-weight: 600;">Register here</a>
+          </p>
+        </form>
+      </div>
+
+      <!-- Doctor Login -->
+      <div id="doctorTab" class="tab-content">
+        <form id="doctorLoginForm">
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" class="form-control" id="doctorEmail" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" id="doctorPassword" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;" id="doctorSubmitBtn">
+            Login
+          </button>
+        </form>
+      </div>
+
+      <!-- Admin Login -->
+      <div id="adminTab" class="tab-content">
+        <form id="adminLoginForm">
+          <div class="form-group">
+            <label class="form-label">Admin Email</label>
+            <input type="email" class="form-control" id="adminEmail" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" id="adminPassword" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;" id="adminSubmitBtn">
+            Login
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    function switchTab(tab) {
+      // Update tab buttons
+      document.querySelectorAll('.login-tab').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      // Update tab content
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      document.getElementById(`${tab}Tab`).classList.add('active');
+
+      // Clear alerts
+      document.getElementById('alertContainer').innerHTML = '';
+    }
+
+    // Patient Login
+    document.getElementById('patientLoginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('patientEmail').value.trim();
+      const password = document.getElementById('patientPassword').value;
+      const submitBtn = document.getElementById('patientSubmitBtn');
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Logging in...';
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          localStorage.setItem('patient', JSON.stringify(data.patient));
+          localStorage.setItem('userType', 'patient');
+          showAlert('Login successful! Redirecting...', 'success');
+          setTimeout(() => window.location.href = 'patient_dashboard.html', 1000);
+        } else {
+          showAlert(data.error || 'Login failed', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Login';
+        }
+      } catch (error) {
+        showAlert('Network error. Please check if the server is running.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Login';
+      }
+    });
+
+    // Doctor Login
+    document.getElementById('doctorLoginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('doctorEmail').value.trim();
+      const password = document.getElementById('doctorPassword').value;
+      const submitBtn = document.getElementById('doctorSubmitBtn');
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Logging in...';
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/doctors/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          localStorage.setItem('doctor', JSON.stringify(data.doctor));
+          localStorage.setItem('userType', 'doctor');
+          showAlert('Login successful! Redirecting...', 'success');
+          setTimeout(() => window.location.href = 'doctor_dashboard.html', 1000);
+        } else {
+          showAlert(data.error || 'Login failed', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Login';
+        }
+      } catch (error) {
+        showAlert('Network error. Please check if the server is running.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Login';
+      }
+    });
+
+    // Admin Login (simple check - in production use proper authentication)
+    document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('adminEmail').value.trim();
+      const password = document.getElementById('adminPassword').value;
+      const submitBtn = document.getElementById('adminSubmitBtn');
+
+      // Simple admin credentials (in production, use proper backend authentication)
+      if (email === 'admin@hospital.com' && password === 'admin123') {
+        localStorage.setItem('admin', JSON.stringify({ email, role: 'admin' }));
+        localStorage.setItem('userType', 'admin');
+        showAlert('Login successful! Redirecting...', 'success');
+        setTimeout(() => window.location.href = 'admin_dashboard.html', 1000);
+      } else {
+        showAlert('Invalid admin credentials', 'error');
+      }
+    });
+
+    function showAlert(message, type) {
+      const alertClass = type === 'error' ? 'alert-error' : 'alert-success';
+      document.getElementById('alertContainer').innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+      setTimeout(() => {
+        document.getElementById('alertContainer').innerHTML = '';
+      }, 5000);
+    }
+  </script>
+</body>
+</html>
